@@ -3,13 +3,15 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "start": "node app.js"
+    "start": "NODE_PATH=. node app.js"
   },
   "dependencies": {
     "cassandra-driver": "^3.2.2",
     "cassandra-migration": "^2.4.0",
     "dotenv": "^4.0.0",
     "node-cmd": "^3.0.0",
-    "simple-git": "^1.75.0"
+    "pkg-require": "0.0.2",
+    "simple-git": "^1.75.0",
+    "undot": "^0.3.0"
   }
 }
