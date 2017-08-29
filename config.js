@@ -10,8 +10,8 @@ config.resources = [{
     },{
     "name":"hue-com-outputengine",
     "repo_link":"some link",
-    "branch":"master",
-    "versionup":false,
+    "branch":"develop",
+    "versionup":true,
     "cqldir": "hue-com-outputengine-cql",
     "versionupdir": "hue-com-outputengine-version-up"
 
@@ -19,7 +19,7 @@ config.resources = [{
     "name":"hue-com-inputengine",
     "repo_link":"some link",
     "branch":"master",
-    "versionup":false,
+    "versionup":true,
     "cqldir": "hue-com-inputengine-cql",
     "versionupdir": "hue-com-inputengine-version-up"
 },{

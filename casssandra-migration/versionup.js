@@ -12,11 +12,11 @@ cassandra_client.connect().then(() => {
         console.log('Connected to cluster with %d host(s): %j', cassandra_client.hosts.length, cassandra_client.hosts.keys());
         console.log('Keyspaces: %j', Object.keys(cassandra_client.metadata.keyspaces));
 
-        execute_cqls(() => {
+        execute_cqls((callback) => {
             console.log("=========Finished executing cqls==========");
-            execute_migration(() => {
-
-            });
+            // execute_migration(() => {
+            //
+            // });
         });
         return cassandra_client.shutdown();
 
@@ -29,6 +29,8 @@ cassandra_client.connect().then(() => {
 
 let execute_cqls = (callback) => {
     find_versionup_cqls(function(cqls){
+        console.log(cqls);
+        console.log(cqls.length);
         if (cqls && cqls.length){
             let cnt = 0;
             //Execute cqls
@@ -41,15 +43,20 @@ let execute_cqls = (callback) => {
                     ,
                     function(err, data, stderr){
                         console.log(data);
+                        console.log("cnt is "+ cnt);
                         if(!err) {
-                            console.log("Executed " + cql + " successfully.");
+                            console.log("Executed " + cql);
+                            if(cnt++ == cqls.length) {
+                                console.log("cnt is " + cnt);
+                                console.log("still works");
+                                callback();
+                            }
                         }
                         else {
                             // console.log(stderr);
                             console.log(err);
                         }
-                        if(++cnt == cqls.length)
-                            callback();
+
                         // }
 
                     });
@@ -62,52 +69,102 @@ let execute_cqls = (callback) => {
 
 let find_versionup_cqls = (callback) => {
 
- require('../manage-projects/sync_source');
- let resources = config.resources;
- let FindFiles = require("node-find-files");
- let cqls = [];
- resources.forEach((resource) => {
-     if(!resource.versionup)
-         return;
-     var finder = new FindFiles({
-         rootFolder : process.env.HUE_WORKSPACE + "/" + resource.name + "/" + resource.cqldir,
-         filterFunction : function (path, stat) {
-             return path.indexOf("CQL") > -1;
-         }
-     });
-     finder.on("match", function(strPath, stat) {
-         cqls.push(strPath);
-     })
-       .on("complete", function() {
-         console.log("Finished Searching for Json files inside " + resource.cqldir);
-         callback(cqls);
-     }).on("patherror", function(err, strPath) {
-         console.log("Error for Path " + strPath + " " + err);
-     }).on("error", function(err) {
-         console.log("Global Error " + err);
-     });
-     finder.startSearch();
- });
+ console.log("inside");
+    find_files(".CQL", (data) => {
+     callback(data);
+    });
+};
+
+let find_files = (type, callback) => {
+    let resources = config.resources;
+    let FindFiles = require("node-find-files");
+    let files = [];
+
+
+
+    resources.forEach((resource) => {
+        if(!resource.versionup)
+            return;
+
+        let searchDir = (() => {
+            switch(type){
+                case ".CQL":return resource.name + "\\" + resource.cqldir;
+                    break;
+
+                case ".jar": return "resources";
+                    break;
+
+                default:return resource.cqldir
+            }
+        })();
+
+        let cnt = 0;
+
+        var finder = new FindFiles({
+            rootFolder : process.env.HUE_WORKSPACE + "\\" + searchDir,
+            filterFunction : function (path, stat) {
+                return path.indexOf(type) > -1;
+            }
+        });
+        finder.on("match", function(strPath, stat) {
+            files.push(strPath);
+        })
+            .on("complete", function() {
+                console.log("Finished Searching for" + type + " files inside " + searchDir + " folder");
+                    callback(files);
+            }).on("patherror", function(err, strPath) {
+            console.log("Error for Path " + strPath + " " + err);
+        }).on("error", function(err) {
+            console.log("Global Error " + err);
+        });
+        finder.startSearch();
+    });
 
 };
+
+
+let find_versionup_jars = (callback) => {
+
+    find_files(".jar", (data) => {
+        callback(data);
+    });
+};
+
+
+
 
 let execute_migration = (callback) => {
 
-    let resources = config.resources;
-    resources.forEach((resource) => {
-       let project_name = resource.name;
+    // resources.forEach((resource) => {
+    //     if(!resource.versionup)
+    //         return;
+    //    let project_name = resource.name;
+    //     cmd.get(
+    //         "cd " + process.env.HUE_WORKSPACE + "\\company-config-files  && " +
+    //         "java -jar \""+ process.env.MIGRATION_RUNNER_JAR + "\" -migrate -to v2.0.0 -projectName " + resource.name +  "-baseJars "
+    //         ,
+    //         function(err, data, stderr){
+    //             console.log(data);
+    //             if(!err) {
+    //                 console.log("Executed " + resource.name + " successfully.");
+    //             }
+    //             else {
+    //                 // console.log(stderr);
+    //                 console.log(err);
+    //             }
+    //             // if(++cnt == cqls.length)
+    //             //     callback();
+    //             // // }
+    //
+    //         });
+    //
+    // });
 
-    });
-    callback();
 
 };
 
 
-//TODO
 
-let cleanup = () => {
-
-};
 
 
 
