@@ -2,21 +2,23 @@
 
 let cass = require('./cassandra');
 var config = require('./../config');
-let cassandra_bt = new cass([ process.env.CASSANDRA_BT_IP ], process.env.CASSANDRA_BT_KEYSPACE);
+let cassandra_bt = new cass([ process.env.CASSANDRA_BT_HOST ], process.env.CASSANDRA_BT_KEYSPACE);
 var cmd=require('node-cmd');
-
+var Promise = require("bluebird");
+const fs = require('fs-extra');
 
 let cassandra_client = cassandra_bt.getClient();
+let resource_versionup_enabled_count = config.resources.filter((resource) => resource.versionup === true).length;
 
 cassandra_client.connect().then(() => {
         console.log('Connected to cluster with %d host(s): %j', cassandra_client.hosts.length, cassandra_client.hosts.keys());
         console.log('Keyspaces: %j', Object.keys(cassandra_client.metadata.keyspaces));
 
         execute_cqls((callback) => {
-            console.log("=========Finished executing cqls==========");
-            // execute_migration(() => {
-            //
-            // });
+            console.log("Now starting migration...");
+            execute_migration((callback) => {
+                console.log("finished migration");
+            });
         });
         return cassandra_client.shutdown();
 
@@ -28,38 +30,33 @@ cassandra_client.connect().then(() => {
     });
 
 let execute_cqls = (callback) => {
+
     find_versionup_cqls(function(cqls){
+
+        const getAsync = Promise.promisify(cmd.get, { multiArgs: true, context: cmd })
+        let cql_count = 0; //count to make callbacks
+
+        console.log("Collected the following CQLs ");
         console.log(cqls);
-        console.log(cqls.length);
+        console.log("Executing now...");
+
         if (cqls && cqls.length){
-            let cnt = 0;
+
             //Execute cqls
             cqls.map((cql) => {
-
-                cmd.get(
-                    "cd " + process.env.HUE_WORKSPACE + "\\company-config-files  && " +
+                getAsync("cd " + process.env.HUE_WORKSPACE + "\\company-config-files  && " +
                     "cp -fr " + cql + " . && " +
-                    "java -jar \""+ process.env.MIGRATION_RUNNER_JAR + "\" -cqlexecutor -timeOut 1000 -cqlSources " + cql.split('\\').pop().trim() + " -skipError -nT 20"
-                    ,
-                    function(err, data, stderr){
-                        console.log(data);
-                        console.log("cnt is "+ cnt);
-                        if(!err) {
-                            console.log("Executed " + cql);
-                            if(cnt++ == cqls.length) {
-                                console.log("cnt is " + cnt);
-                                console.log("still works");
-                                callback();
-                            }
-                        }
-                        else {
-                            // console.log(stderr);
-                            console.log(err);
-                        }
+                    "java -jar \""+ process.env.MIGRATION_RUNNER_JAR + "\" -cqlexecutor -timeOut 1000 -cqlSources " + cql.split('\\').pop().trim() + " -skipError -nT 20")
+                    .then(data => {
+                    console.log(data);
 
-                        // }
-
-                    });
+                    if(++cql_count == cqls.length) {
+                        console.log("\n ==========Finished execution of CQL statements. Please check the above logs and verify that the new columns/column families are created in " + process.env.CASSANDRA_BT_HOST + "==========");
+                        callback();
+                    }
+                }).catch(err => {
+                    console.log('Error occurred during executing of CQL queries \n', err);
+                });
             });
         }
 
@@ -69,8 +66,9 @@ let execute_cqls = (callback) => {
 
 let find_versionup_cqls = (callback) => {
 
- console.log("inside");
+    let resource_cnt = 0;
     find_files(".CQL", (data) => {
+     if(++resource_cnt === resource_versionup_enabled_count)
      callback(data);
     });
 };
@@ -79,8 +77,6 @@ let find_files = (type, callback) => {
     let resources = config.resources;
     let FindFiles = require("node-find-files");
     let files = [];
-
-
 
     resources.forEach((resource) => {
         if(!resource.versionup)
@@ -97,8 +93,6 @@ let find_files = (type, callback) => {
                 default:return resource.cqldir
             }
         })();
-
-        let cnt = 0;
 
         var finder = new FindFiles({
             rootFolder : process.env.HUE_WORKSPACE + "\\" + searchDir,
@@ -123,43 +117,31 @@ let find_files = (type, callback) => {
 };
 
 
-let find_versionup_jars = (callback) => {
-
-    find_files(".jar", (data) => {
-        callback(data);
-    });
-};
-
-
-
-
 let execute_migration = (callback) => {
 
-    // resources.forEach((resource) => {
-    //     if(!resource.versionup)
-    //         return;
-    //    let project_name = resource.name;
-    //     cmd.get(
-    //         "cd " + process.env.HUE_WORKSPACE + "\\company-config-files  && " +
-    //         "java -jar \""+ process.env.MIGRATION_RUNNER_JAR + "\" -migrate -to v2.0.0 -projectName " + resource.name +  "-baseJars "
-    //         ,
-    //         function(err, data, stderr){
-    //             console.log(data);
-    //             if(!err) {
-    //                 console.log("Executed " + resource.name + " successfully.");
-    //             }
-    //             else {
-    //                 // console.log(stderr);
-    //                 console.log(err);
-    //             }
-    //             // if(++cnt == cqls.length)
-    //             //     callback();
-    //             // // }
-    //
-    //         });
-    //
-    // });
+        const getAsync = Promise.promisify(cmd.get, { multiArgs: true, context: cmd })
+        let resources = config.resources;
+        let resource_count = 0;
+        resources.forEach((resource) => {
+            if(!resource.versionup)
+                return;
 
+            getAsync("cd " + process.env.HUE_WORKSPACE + "\\company-config-files  && " +
+                "java -jar " + "../resources/migrator-java-runner-" + process.env.MIGRATOR_JAVA_RUNNER_VERSION +  "-bin.jar -migrate -to " + process.env.CASSANDRA_MIGRATE_VERSION + " -projectName " + resource.name + " -baseJars ../resources/*.jar &&" +
+                "echo[ && echo \" Now performing json import \" && echo[ && " +
+                "java -jar " + "../resources/migrator-java-runner-" + process.env.MIGRATOR_JAVA_RUNNER_VERSION +  "-bin.jar -import -projectName " + resource.name + " -baseJars + ../resources/*.jar"
+            )
+                .then(data => {
+                    console.log(data);
+
+                    if (++resource_count == resource_versionup_enabled_count) {
+                        console.log("\n ========== Finished migration. Please check and confirm that the db is migrated to the correct version ==========");
+                        callback();
+                    }
+                }).catch(err => {
+                console.log('Error occurred during migration \n', err);
+            });
+        });
 
 };
 

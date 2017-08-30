@@ -1,14 +1,16 @@
 {
-  "name": "application-name",
+  "name": "hue-com-ifx-internal-utils",
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "start": "NODE_PATH=. node app.js"
+    "start": "npm install && node app.js"
   },
   "dependencies": {
+    "bluebird": "^3.5.0",
     "cassandra-driver": "^3.2.2",
     "cassandra-migration": "^2.4.0",
     "dotenv": "^4.0.0",
+    "fs-extra": "^4.0.1",
     "node-cmd": "^3.0.0",
     "pkg-require": "0.0.2",
     "simple-git": "^1.75.0",

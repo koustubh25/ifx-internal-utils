@@ -1,1 +1,0 @@
-create table emp (empid int primary key,emp_first varchar, emp_last varchar, emp_dept varchar);
