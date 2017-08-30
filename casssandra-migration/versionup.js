@@ -44,9 +44,9 @@ let execute_cqls = (callback) => {
 
             //Execute cqls
             cqls.map((cql) => {
-                getAsync("cd " + process.env.HUE_WORKSPACE + "\\company-config-files  && " +
+                getAsync("cd " + process.env.HUE_WORKSPACE + "/company-config-files  && " +
                     "cp -fr " + cql + " . && " +
-                    "java -jar \""+ process.env.MIGRATION_RUNNER_JAR + "\" -cqlexecutor -timeOut 1000 -cqlSources " + cql.split('\\').pop().trim() + " -skipError -nT 20")
+                    "java -jar ../resources/migrator-java-runner-" + process.env.MIGRATOR_JAVA_RUNNER_VERSION +  "-bin.jar -cqlexecutor -timeOut 1000 -cqlSources " + cql.split('/').pop().trim() + " -skipError -nT 20")
                     .then(data => {
                     console.log(data);
 
@@ -84,7 +84,7 @@ let find_files = (type, callback) => {
 
         let searchDir = (() => {
             switch(type){
-                case ".CQL":return resource.name + "\\" + resource.cqldir;
+                case ".CQL":return resource.name + "/" + resource.cqldir;
                     break;
 
                 case ".jar": return "resources";
@@ -95,7 +95,7 @@ let find_files = (type, callback) => {
         })();
 
         var finder = new FindFiles({
-            rootFolder : process.env.HUE_WORKSPACE + "\\" + searchDir,
+            rootFolder : process.env.HUE_WORKSPACE + "/" + searchDir,
             filterFunction : function (path, stat) {
                 return path.indexOf(type) > -1;
             }
@@ -126,10 +126,10 @@ let execute_migration = (callback) => {
             if(!resource.versionup)
                 return;
 
-            getAsync("cd " + process.env.HUE_WORKSPACE + "\\company-config-files  && " +
-                "java -jar " + "../resources/migrator-java-runner-" + process.env.MIGRATOR_JAVA_RUNNER_VERSION +  "-bin.jar -migrate -to " + process.env.CASSANDRA_MIGRATE_VERSION + " -projectName " + resource.name + " -baseJars ../resources/*.jar &&" +
+            getAsync("cd " + process.env.HUE_WORKSPACE + "/company-config-files  && " +
+                "java -jar ../resources/migrator-java-runner-" + process.env.MIGRATOR_JAVA_RUNNER_VERSION +  "-bin.jar -migrate -to " + process.env.CASSANDRA_MIGRATE_VERSION + " -projectName " + resource.name + " -baseJars ../resources/*.jar &&" +
                 "echo[ && echo \" Now performing json import \" && echo[ && " +
-                "java -jar " + "../resources/migrator-java-runner-" + process.env.MIGRATOR_JAVA_RUNNER_VERSION +  "-bin.jar -import -projectName " + resource.name + " -baseJars + ../resources/*.jar"
+                "java -jar ../resources/migrator-java-runner-" + process.env.MIGRATOR_JAVA_RUNNER_VERSION +  "-bin.jar -import -projectName " + resource.name + " -baseJars + ../resources/*.jar"
             )
                 .then(data => {
                     console.log(data);
